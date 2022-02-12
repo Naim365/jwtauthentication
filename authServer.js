@@ -6,25 +6,34 @@ const app = express();
 
 app.use(express.json());
 
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 4000;
 
-const posts = [
-  
-    {
-        username: 'Naim',
-        title: "Software Engineer"
-    },
-    {
-        username: 'Sazid',
-        title: "Ju Software Engineer"
-    }
-]
 
-app.get('/posts', authenticationToken, (req, res) => {
+// app.post('/token', (req, res) => {
+    
+//     const refreshToken = req.body.token;
+//     if (refreshToken === process.env.REFRESH_TOKEN) {
+//         const accessToken = jwt.sign({ name: 'Naim' }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' });
+//         res.json({ accessToken: accessToken });
+//         } else {
+//             res.sendStatus(401);
+//             }
+//             });
 
-    // res.json(posts);
+let refreshTokens = [];
 
-  res.json(posts.filter(post => post.username === req.user.name));
+app.post('/token', (req, res) => {
+    
+    const refreshToken = req.body.token;
+
+    if (refreshToken == null) return res.sendStatus(401);
+    if (!refreshTokens.includes(refreshToken)) return res.sendStatus(403)
+    jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET, (err, user) => {
+        if (err) return res.sendStatus(403)
+        const accessToken = generateAccessToken({name: user.name})
+        res.json({accessToken : accessToken});
+    })
+    
 });
 
 app.post('/login', (req, res) => {
@@ -34,21 +43,19 @@ app.post('/login', (req, res) => {
 
     const accessToken = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET);
 
-    res.json({accessToken: accessToken});
+    const refreshToken = jwt.sign(user, process.env.REFRESH_TOKEN_SECRET);
+    refreshToken.push(refreshToken);
+    res.json({accessToken: accessToken, refreshToken: refreshToken});
 });
 
-function authenticationToken(req, res, next) {
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
-    if(token == null) return res.sendStatus(401);
 
-    jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, user) => {
-        if (err) return res.sendStatus(403)
-        req.user = user
-        next()
-    })
+function generateAccessToken(user) {
+    return jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
+        expiresIn: '15m'
+    });
 
 }
+
 // app.post('/login', (req, res) => {
 //     const { email, password } = req.body;
   
